@@ -41,7 +41,16 @@ npm run typecheck   # tsc -b
 npm test            # vitest
 npm run build       # typecheck + production build into dist/
 npm run format      # Prettier (CI runs prettier --check)
+
+# Production image (Nginx serving dist/): the token reaches npm ci only, as a build secret
+docker build --secret id=npm_token,env=NPM_TOKEN -t calico-web .
 ```
+
+**Deploying:** `.github/workflows/image.yml` publishes `ghcr.io/harunmarangoz/calico-web`
+(`:sha-<commit>` from main, `:<version>` from a `v<version>` tag). The stack that runs it —
+local, staging, prod, Cloudflare Tunnel — is `calico.root/deploy` (README there); the panel
+reaches the Cloud API at `/api` on its own origin through that stack's gateway. With the local
+stack up, `npm run dev` proxies `/api` to it (`CALICO_API_URL`, default `http://localhost:8000`).
 
 ## Layout
 
@@ -52,6 +61,7 @@ src/ui/             # Layout (sidebar + page), Icon, theme choice (data-theme + 
 src/pages/          # one component per section
 src/i18n/strings.ts # every user-facing string (Turkish)
 src/app.css         # layout only, all values are token variables
+nginx/              # the image's server config: SPA fallback, caching, security headers (CSP)
 ```
 
 ## Rules
@@ -65,6 +75,9 @@ src/app.css         # layout only, all values are token variables
   `calico.design`, then `npm update @harunmarangoz/calico-design` here.
 - Theme: `tokens.css` follows the OS until `<html data-theme>` is set; only `src/ui/theme.ts`
   touches that attribute.
+- The CSP (`nginx/security-headers.conf`) allows scripts and connections to the panel's own
+  origin only, styles and fonts from Google Fonts besides. A new external origin (an API host, a
+  CDN, analytics) needs a CSP change in the same commit, checked in a browser.
 - Every user-facing string lives in `src/i18n/strings.ts`. Never "Home Assistant" (or its
   logo): `strings.test.ts` guards it.
 - Tests: Vitest + Testing Library, colocated `*.test.ts(x)`; query by role and label.
